@@ -69,7 +69,6 @@ public class ExecuteScript extends Command{
             while (it.hasNext()) {
                 Pair<String, ArrayList<String>> command = it.next();
 
-                response.add("Cчитанная строка: " + command); //TODO убрать
                 ArrayList<String> scriptPath = new ArrayList<>();
                 Pair<String, ArrayList<String>> script = new Pair<>("execute_script", scriptPath);
                 scriptPath.add(argument);
@@ -118,7 +117,7 @@ public class ExecuteScript extends Command{
                     command.setFirst(command.getFirst() + " " + command.getSecond());
                     Request request = new Request(command.getFirst(), command.getSecond(), false);
 
-                    response.add("Аргумент " + command.getSecond().toString());
+                    //response.add("Аргумент " + command.getSecond().toString());
                     response.add("Выполняется команда: " + request.command_name);
                     response.add(this.commandExecuter.executeCommand(request).toString());
                 }
