@@ -5,6 +5,7 @@ import QA.Response;
 import objectpack.Ticket;
 import server.database.Collection;
 import server.filework.*;
+import server.userspace.User;
 import server.util.InfoSender;
 import server.util.OutStreamInfoSender;
 import server.util.Pair;
@@ -16,6 +17,9 @@ import commands.BlankCommand;
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 /**
  * Класс - исполнитель комманд
  */
@@ -40,6 +44,7 @@ public class CommandExecuter {
     private FileSaver fileSaver;
     /** @see FileSaver */
     private LinkedList<String> executedRecursionScript = new LinkedList<>();
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
     /**
      * Статический метод, предоставляющий доступ к экземпляру класса исполнителя комманд
      */
@@ -96,37 +101,43 @@ public class CommandExecuter {
      * @param request запрос
      */
     public Response executeCommand(Request request/*String command, ArrayList<String> element*/) {
+        lock.writeLock().lock();
+        try {
+          //  User user = request.getUser();
 
-        String command_name = request.command_name;
-        String argument = request.argument;
-        Ticket ticket = request.element;
-        Response response;
-        Command commandToExecute = this.invoker.getCommandToExecute(command_name, this.collection, argument, ticket, this.history);
+            String command_name = request.command_name;
+            String argument = request.argument;
+            Ticket ticket = request.element;
+            Response response;
+            Command commandToExecute = this.invoker.getCommandToExecute(command_name, this.collection, argument, ticket, this.history);
 
-        for (String s : executedRecursionScript) {
-            if (s.equals(argument)) {
-                response = new Response("Рекурсия в скрипте! Инструкция пропущена. Скрипт продолжается...");
-                return response;
+            for (String s : executedRecursionScript) {
+                if (s.equals(argument)) {
+                    response = new Response("Рекурсия в скрипте! Инструкция пропущена. Скрипт продолжается...");
+                    return response;
+                }
             }
-        }
 
-        if(request.sentFromClient) {
-            if (commandToExecute instanceof ExecuteScript) {
-                this.executedRecursionScript.add(argument);
-            } else if (request.saveFlag) {
-                response = new Response("Сохранение происходит автоматически");
-                request.saveFlag = false;
-                return response;
+            if (request.sentFromClient) {
+                if (commandToExecute instanceof ExecuteScript) {
+                    this.executedRecursionScript.add(argument);
+                } else if (request.saveFlag) {
+                    response = new Response("Сохранение происходит автоматически");
+                    request.saveFlag = false;
+                    return response;
+                }
+            } else {
+                System.out.println("Выполняется сохранение");
             }
-        }
-        else {
-            System.out.println("Выполняется сохранение");
-        }
-        response = commandToExecute.execute();
-        if(!(commandToExecute instanceof BlankCommand))
-            this.writeCommandToHistory(new Pair<>(command_name, commandToExecute));
+            response = commandToExecute.execute();
+            if (!(commandToExecute instanceof BlankCommand))
+                this.writeCommandToHistory(new Pair<>(command_name, commandToExecute));
 
-        return response;
+            return response;
+        }
+        finally {
+            lock.writeLock().unlock();
+        }
     }
 
     public boolean checkExecutedRecursionScript(String toCheck) {

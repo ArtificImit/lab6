@@ -45,9 +45,6 @@ public class Request implements Serializable {
     public String toString() {
         return "Request{" +
                 "command_name='" + command_name + '\'' +
-                ", argument='" + argument + '\'' +
-                ", element=" + element +
-                ", sentFromClient=" + sentFromClient +
-                '}';
+                ", argument='" + argument + '}';
     }
 }

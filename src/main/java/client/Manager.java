@@ -2,13 +2,12 @@ package client;
 
 import QA.Request;
 import QA.Response;
+import commands.Authentication;
 import commands.CommandMap;
 import commands.CommandUsingElement;
 import commands.CommandWithId;
 import objectpack.EventType;
-import objectpack.Ticket;
 import objectpack.TicketType;
-import objectpack.exceptions.TicketException;
 
 import java.util.*;
 
@@ -35,7 +34,8 @@ public class Manager {
         Response response;
         response = this.client.start();
         this.commandMap = (CommandMap) response.getResponse()[0];
-
+        String username;
+        String password;
         System.out.println("Здравсвтуйте, для получения справки по командам введите help");
         run();
     }
@@ -55,6 +55,9 @@ public class Manager {
     }
     public boolean checkIfNeedId(String commandName){
         return CommandWithId.class.isAssignableFrom(this.commandMap.get(commandName));
+    }
+    public boolean checkAuthentication(String commandName){
+        return Authentication.class.isAssignableFrom(this.commandMap.get(commandName));
     }
     /**
      *
@@ -119,6 +122,16 @@ public class Manager {
 
         return args;
     }
+    private ArrayList<String> readLogin(){
+        ArrayList<String> args = new ArrayList<String>();
+        args.add(getArgumentWithRules("Введите имя пользователя",
+                arg -> !arg.trim().isEmpty()));
+        args.add(getArgumentWithRules("Введите пароль",
+                arg -> !arg.trim().isEmpty()));
+
+
+        return args;
+    }
 
 
     /**
@@ -145,6 +158,18 @@ public class Manager {
                 }
                 if (this.checkIfNeedElement(commandToCheck[0]))
                     element = this.readElement();
+                if (this.checkAuthentication(commandToCheck[0])){
+                    if (Objects.equals(commandToCheck[0], "login")){
+                        element = this.readLogin();
+                        Request request = new Request("login", element, true);
+                        this.client.sendRequest(request);
+                    }
+                    else{
+                        element = this.readLogin();
+                        Request request = new Request("register", element, true);
+                        this.client.sendRequest(request);
+                    }
+                }
                 if (Objects.equals(commandToCheck[0], "save")){
                     Request request = new Request("", element, true);
                     request.saveFlag = true;

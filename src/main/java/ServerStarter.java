@@ -22,6 +22,8 @@ public class ServerStarter {
         invoker.register("remove_by_id", RemoveById.class);
         invoker.register("show", Show.class);
         invoker.register("update", Update.class);
+        invoker.register("login", Login.class);
+        invoker.register("register", Register.class);
         Server server = new Server(8387);
         server.run();
 

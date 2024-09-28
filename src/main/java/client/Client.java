@@ -22,6 +22,9 @@ public class Client {
         try {
             this.socket = new Socket(server_address, server_port);
             System.out.println("Подключение завершено");
+            System.out.println("Пожалуйста зарегистрируйтесь или войдите");
+            System.out.println("Команда для входа: login username password");
+            System.out.println("Команда для register username password");
             return receiveResponse();
         } catch (IOException e) {
             System.out.println("Ошибка подключения: Сервер недоступен");

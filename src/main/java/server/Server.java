@@ -11,15 +11,21 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Server {
     private ServerSocketChannel serverSocketChannel;
+    private ForkJoinPool requestPool;
     private SocketChannel clientChannel;
     private CommandExecuter commandExecuter;
+    private static final AtomicInteger clientCounter= new AtomicInteger(0);;
     private static final ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Server.class);
 
     public Server(int port) {
         this.commandExecuter = CommandExecuter.getAccess();
+        requestPool = new ForkJoinPool();
         try {
             this.serverSocketChannel = ServerSocketChannel.open();
             this.serverSocketChannel.bind(new InetSocketAddress(port));
@@ -28,7 +34,6 @@ public class Server {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     commandExecuter.externalSave();
-                    logger.info("Состояние сохранено");
                 } catch (Exception e) {
                     logger.error("Ошибка при сохранении состояния", e);
                 }
@@ -151,6 +156,7 @@ public class Server {
             System.exit(0); // Завершаем выполнение программы
         } catch (IOException e) {
             logger.error("Ошибка при завершении работы сервера", e);
+            commandExecuter.externalSave();
         }
     }
 
@@ -163,24 +169,56 @@ public class Server {
             logger.info("Ожидание клиента...");
             SocketChannel clientChannel = catchClient();
             logger.info("Клиент подключен");
+
             Response response = new Response(Invoker.getAccess().getCommandMapClone());
+
             sendResponse(clientChannel, response);
+            requestPool.submit(() -> handleClient(clientChannel));
+        }
+    }
+    private void handleClient(SocketChannel clientChannel) {
+        int clientId = clientCounter.incrementAndGet();
+        logger.info("Клиент " + clientId + " подключен.");
+        try {
             while (true) {
                 if (!clientChannel.isConnected()) {
                     clientChannel.close();
+                    logger.info("Клиент " + clientId + " отключился.");
                     break;
                 }
-                logger.info("Ожидание запроса...");
-                logger.info("Сокет закрыт?" + clientChannel.socket().isClosed());
-                Request request = receiveRequest(clientChannel);
-                if (request == null){
-                    break;
-                }
-                logger.info("Запрос получен: {}", request);
-                response = commandExecuter.executeCommand(request);
-                sendResponse(clientChannel, response);
 
+
+
+                Request request = receiveRequest(clientChannel);
+                if (request == null) {
+                    logger.info("Клиент " + clientId + " завершил соединение.");
+                    break;
+                }
+                logger.info("Получен запрос от клиента " + clientId + ": " + request);
+
+                // Обрабатываем запрос в отдельном потоке
+                new Thread(() -> {
+                    ArrayList<String> element = new ArrayList<>();
+                    Request loginReq = new Request("login", element, false);
+                    Request registerReq = new Request("register", element, false);
+                    Response response;
+                    if(!request.equals(loginReq) || !request.equals(registerReq)){
+                        response = new Response("Пожалуйста войдите или зарегистрируйтесь с помощью команд login и register соответственно");
+                    }
+                    else {
+                        response = commandExecuter.executeCommand(request);
+                    }
+                    try {
+                        sendResponse(clientChannel, response);
+                        logger.info("Ответ успешно отправлен клиенту " + clientId);
+                    } catch (IOException e) {
+                        logger.error("Ошибка при отправке ответа", e);
+                    }
+                }).start();
             }
+        } catch (IOException e) {
+            logger.error("Ошибка при обработке клиента", e);
         }
     }
 }
+
